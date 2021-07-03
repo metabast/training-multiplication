@@ -2,12 +2,17 @@ const inquirer = require('inquirer');
 const figlet = require('figlet');
 const _ = require('lodash');
 
-var cycle, cycle, countWin, lostIndex, cycleSav, tableNum, tables, multiplications, multiplicationsSave;
+var firstRun, countWin, lostIndex, tables, multiplications, multiplicationsSaved , multiplicationsRunLocked, timer;
 
-class Vector2{
+class Multi{
     constructor(x, y){
         this.x = x;
         this.y = y;
+        this.lostCount = 0;
+    }
+
+    calculate(){
+        return this.x * this.y;
     }
 }
 
@@ -20,46 +25,25 @@ function choiceTables()
             message: "Quelles tables ?"
         }
     ]).then( (answers)=>{
-        console.log(answers.tables.length);
-        if(answers.tables.length == 1)
-            choiceTable(answers.tables);
-        else{
-            tables = answers.tables.split('')
-            console.log(tables);
-            multiplications = [];
-            multiplicationsSave = [];
-            tables.forEach( ( multiple, index)=> {
-                [4,6,7,8,9,12].forEach( (factor) => {
-                    multiplications.push(new Vector2(Number(multiple), factor));
-                } )
-            });
+        
+        timer = new Date().getTime()
+        tables = answers.tables.split(' ')
+        multiplications = [];
+        multiplicationsSaved = [];
+        multiplicationsRunLocked = [];
+        tables.forEach( ( multiple, index)=> {
+            // [4,6].forEach( (factor) => {
+            [4,6,7,8,9,12].forEach( (factor) => {
+                multiplications.push(new Multi(Number(multiple), factor));
+            } )
+        });
 
-            multiplications = _.shuffle(multiplications);
-            multiplicationsSave = _.clone(multiplications);
-        }
-        next();
-        // tableNum = Number(answers.table);
-        // cycle = _.shuffle([4,6,7,8,9,12]);
-        // cycleSaved = _.clone(cycle);
-        // lostIndex = []
-        // countWin = 0;
-        // next();
-    }).catch( (err) =>{
+        multiplications = _.shuffle(multiplications);
+        multiplications.forEach( function(multi, index) {
+            multiplicationsSaved.push(multi);
+            multiplicationsRunLocked.push(multi);
+        });
 
-    })
-}
-
-function choiceTable(){
-    inquirer.prompt([
-        {
-            type : "input",
-            name: "table",
-            message: "Quelle table ?"
-        }
-    ]).then( (answers)=>{
-        tableNum = Number(answers.table);
-        cycle = _.shuffle([4,6,7,8,9,12]);
-        cycleSaved = _.clone(cycle);
         lostIndex = []
         countWin = 0;
         next();
@@ -70,60 +54,46 @@ function choiceTable(){
 
 function next(){
     console.clear()
-    let randNum = cycle.shift()
+    let multiplication = multiplications.shift();
 
     inquirer.prompt([
         {
             type : "number",
             name: "result",
-            message: `${tableNum} x ${randNum}`
+            message: `${multiplication.x} x ${multiplication.y}`
         }
     ]).then( (answers)=>{
 
-        if(answers.result == tableNum*randNum)
+        if(answers.result == multiplication.calculate())
             countWin ++
         else{
-            lostIndex.push(cycleSaved.length - cycle.length  - 1);
+            lostIndex.push(multiplicationsSaved.length - multiplications.length  - 1);
         }
 
 
-        figlet( String(tableNum*randNum), (err, data) => {
+        figlet( String(multiplication.calculate()), (err, data) => {
             if(err){}
             console.log(data);
         });
 
         _.delay( ()=>{
-            if(cycle.length)
+            if(multiplications.length)
                 next();
             else{
                 if(false){
                     showResult();
-                    choiceTable();
+                    choiceTables();
                 }
-                if(countWin < cycleSaved.length)
+                if(countWin < multiplicationsSaved.length)
                     retryFailed();
-                else
-                    choiceTable();
+                else{
+                    console.log(multiplicationsRunLocked);
+                    console.log('Exercice terminé en ', (new Date().getTime() - timer) *.001, 'secondes' )
+                    choiceTables();
+                }
 
             }
         }, 1000 )
-
-        // inquirer.prompt([
-        // {
-        //     type : "input",
-        //     name: "next",
-        //     message: "next (enter)"
-        // }
-        // ]).then( (answers)=>{
-
-        //     if(cycle.length)
-        //         next();
-        //     else{
-        //         console.log(countWin, '/', cycleSaved.length);
-        //         choiceTable();
-        //     }
-        // }).catch( (err) =>{
-        // })
 
     }).catch( (err) =>{
 
@@ -132,27 +102,32 @@ function next(){
 }
 
 function showResult(){
-    console.log('Résultat', countWin, '/', cycleSaved.length);
-    if(countWin < cycleSaved.length){
+    console.log('Résultat', countWin, '/', multiplicationsSaved.length);
+    if(countWin < multiplicationsSaved.length){
         console.log('Revoir : ');
         lostIndex = lostIndex.sort();
-        lostIndex.forEach( (index) =>{
-            console.log( ' - ' ,tableNum, 'x' ,cycleSaved[index], '=', tableNum*cycleSaved[index]);
-        } )
+        // lostIndex.forEach( (index) =>{
+        //     console.log( ' - ' ,tableNum, 'x' ,multiplicationsSaved[index], '=', tableNum*multiplicationsSaved[index]);
+        // } )
     }
 }
 
 function retryFailed(){
-    cycle = []
+    multiplications = []
     lostIndex.forEach( (index) =>{
-        cycle.push(cycleSaved[index]);
+        multiplicationsSaved[index].lostCount ++
+        multiplications.push(multiplicationsSaved[index]);
     } )
-    cycle = _.shuffle(cycle);
-    cycleSaved = _.clone(cycle);
+    console.log(multiplicationsRunLocked);
+    multiplications = _.shuffle(multiplications);
+    multiplicationsSaved = [];
+    multiplications.forEach( function(multi, index) {
+        multiplicationsSaved.push(multi);
+    });
     lostIndex = []
     countWin = 0;
 
-    next();
+    _.delay( next, 2000 )
 }
 
 
